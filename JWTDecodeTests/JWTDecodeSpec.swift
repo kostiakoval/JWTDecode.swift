@@ -29,8 +29,8 @@ let inTwoHours = NSDate(timeIntervalSinceNow: 2 * 60 * 60)
 
 func jwtWithPayload(payload: [String: AnyObject]) -> String {
     var jwt: String = ""
-    if let data = NSJSONSerialization.dataWithJSONObject(payload, options: .allZeros, error: nil) {
-        let base64 = data.base64EncodedStringWithOptions(.allZeros)
+    if let data = try? NSJSONSerialization.dataWithJSONObject(payload, options: []) {
+        let base64 = data.base64EncodedStringWithOptions([])
             .stringByReplacingOccurrencesOfString("+", withString: "-")
             .stringByReplacingOccurrencesOfString("/", withString: "_")
             .stringByReplacingOccurrencesOfString("=", withString: "")

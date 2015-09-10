@@ -25,34 +25,34 @@ import Foundation
 /**
 Decodes the JWT and return it's payload
 
-:param: jwt to be decoded
+- parameter jwt: to be decoded
 
-:returns: the JWT payload or nil when it can be decoded
+- returns: the JWT payload or nil when it can be decoded
 */
-public func payload(#jwt: String) -> [String: AnyObject]? {
-    return JWTDecoder(jwt: jwt).payloadWithError(nil)
+public func payload(jwt jwt: String) -> [String: AnyObject]? {
+    return try? JWTDecoder(jwt: jwt).payloadWithError()
 }
 
 /**
 Check if the JWT is expired using the `exp` claim.
 If the `exp` claim is missing or the jwt can't be decoded it will return true
 
-:param: jwt that will be checked for expiration
+- parameter jwt: that will be checked for expiration
 
-:returns: if the JWT is expired or not
+- returns: if the JWT is expired or not
 */
-public func expired(#jwt: String) -> Bool {
+public func expired(jwt jwt: String) -> Bool {
     return JWTDecoder(jwt: jwt).expired
 }
 
 /**
 Returns the value of the `exp` claim
 
-:param: jwt to be decoded
+- parameter jwt: to be decoded
 
-:returns: date that the JWT will expire or nil
+- returns: date that the JWT will expire or nil
 */
-public func expireDate(#jwt: String) -> NSDate? {
+public func expireDate(jwt jwt: String) -> NSDate? {
     return JWTDecoder(jwt: jwt).expireDate
 }
 
@@ -71,9 +71,9 @@ public class JWTDecoder: NSObject {
     /**
     Create a new instance of JWTDecoder
 
-    :param: jwt to decode
+    - parameter jwt: to decode
 
-    :returns: a new instance
+    - returns: a new instance
     */
     public init(jwt: String) {
         self.jwt = jwt
@@ -82,17 +82,15 @@ public class JWTDecoder: NSObject {
     /**
     Returns the payload of the JWT
 
-    :param: error if the JWT can't be decoded
+    - parameter error: if the JWT can't be decoded
 
-    :returns: dictionary with JWT payload
+    - returns: dictionary with JWT payload
     */
-    public func payloadWithError(error: NSErrorPointer) -> [String: AnyObject]? {
+    public func payloadWithError() throws -> [String: AnyObject] {
+        var error: NSError! = NSError(domain: "Migrator", code: 0, userInfo: nil)
         let parts = jwt.componentsSeparatedByString(".")
         if parts.count != 3 {
-            if error != nil {
-                error.memory = errorWithDescription(NSLocalizedString("malformed jwt token \(jwt) only has \(parts.count) parts (3 parts are required)", comment: "Not enough jwt parts"))
-            }
-            return nil
+            throw errorWithDescription(NSLocalizedString("malformed jwt token \(jwt) only has \(parts.count) parts (3 parts are required)", comment: "Not enough jwt parts"))
         }
         var base64 = parts[1]
             .stringByReplacingOccurrencesOfString("-", withString: "+")
@@ -105,13 +103,14 @@ public class JWTDecoder: NSObject {
             base64 = base64.stringByAppendingString(padding)
         }
         if let data = NSData(base64EncodedString: base64, options: .IgnoreUnknownCharacters) {
-            return NSJSONSerialization.JSONObjectWithData(data, options: .allZeros, error: error) as? [String: AnyObject]
-        } else {
-            if error != nil {
-                error.memory = errorWithDescription(NSLocalizedString("malformed jwt token \(jwt). failed to decode base64 payload", comment: "Invalid base64"))
+            if let value = try NSJSONSerialization.JSONObjectWithData(data, options: []) as? [String: AnyObject] {
+                return value
             }
+            throw error
+        } else {
+            error = errorWithDescription(NSLocalizedString("malformed jwt token \(jwt). failed to decode base64 payload", comment: "Invalid base64"))
         }
-        return nil
+        throw error
     }
 
     /// If the JWT is expired or not
@@ -124,7 +123,7 @@ public class JWTDecoder: NSObject {
 
     /// Date when the JWT will expire
     public var expireDate: NSDate? {
-        if let payload = self.payloadWithError(nil), let exp = payload["exp"] as? Double {
+        if let payload = try? self.payloadWithError(), let exp = payload["exp"] as? Double {
             return NSDate(timeIntervalSince1970: exp)
         }
         return nil
